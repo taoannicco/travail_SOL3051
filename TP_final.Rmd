@@ -5,8 +5,20 @@ date: "2023-04-05"
 ---
 
 
-```{r}
-
+```{r Packages}
+#install.packages("tree")
+library(tree)
+library(mice)
+library(tidyverse)
+library(glmnet)
+library(dplyr)
+library(ggplot2)
+library(CUFF)
+library(haven)
+library(knitr)
+library(xtable)
+library(pairwise)
+library(latex2exp)
 ```
 
 
