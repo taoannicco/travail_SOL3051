@@ -19,10 +19,196 @@ library(knitr)
 library(xtable)
 library(pairwise)
 library(latex2exp)
+library(ISLR2)
 ```
 
+## Arbres de classifications : 
+
+Utilisation des arbres de classification pour analyser l'ensemble de données de la thèse d'Éric Lacourse.
+
+On commence par imputer les données afin de ne pas avoir de valeurs manquantes : 
+
+1. Importation des données
+
+```{r message=FALSE, error=FALSE}
+# Importation données
+#input_data <- read.csv("~/Desktop/Hiver 2023/SOL3051/TP1/Donnees_these_Lacourse.csv" , na.strings = c("#NULL!", "NA"))
+#ou
+input_data <- read.csv("Donnees_these_Lacourse.csv", na.strings = c("#NULL!", "NA"))
+```
+
+2. Sélection des variables
+
+```{r pressure, echo=FALSE}
+# Sélection des variables
+
+data_v1 <- input_data[c("age", "travp","travm", "negp9", "negm9", "dets4", "dets13", "deta4", "deta13", "mus2", 
+         "muspre", "mustemp", "mushr", "alien1", "alien2", "sui1", "sui8", "drog1","drog2", "drog3", "drog4")]
+
+```
+
+3. Imputation
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Imputation
+summary(data_v1)
+data_v1$travp[which(is.na(data_v1$travp))] = mean(data_v1$travp, na.rm = TRUE)
+data_v1$travm[which(is.na(data_v1$travm))] = mean(data_v1$travm, na.rm = TRUE)
+data_v1$negp9[which(is.na(data_v1$negp9))] = mean(data_v1$negp9, na.rm = TRUE)
+data_v1$dets4[which(is.na(data_v1$dets4))] = mean(data_v1$dets4, na.rm = TRUE)
+data_v1$dets13[which(is.na(data_v1$dets13))] = mean(data_v1$dets13, na.rm = TRUE)
+data_v1$deta4[which(is.na(data_v1$deta4))] = mean(data_v1$deta4, na.rm = TRUE)
+data_v1$deta13[which(is.na(data_v1$deta13))] = mean(data_v1$deta13, na.rm = TRUE)
+data_v1$mus2[which(is.na(data_v1$mus2))] = mean(data_v1$mus2, na.rm = TRUE)
+data_v1$muspre[which(is.na(data_v1$muspre))] = mean(data_v1$muspre, na.rm = TRUE)
+data_v1$mustemp[which(is.na(data_v1$mustemp))] = mean(data_v1$mustemp, na.rm = TRUE)
+data_v1$mushr[which(is.na(data_v1$mushr))] = mean(data_v1$mushr, na.rm = TRUE)
+data_v1$alien1[which(is.na(data_v1$alien1))] = mean(data_v1$alien1, na.rm = TRUE)
+data_v1$alien2[which(is.na(data_v1$alien2))] = mean(data_v1$alien2, na.rm = TRUE)
+data_v1$sui1[which(is.na(data_v1$sui1))] = mean(data_v1$sui1, na.rm = TRUE)
+data_v1$sui8[which(is.na(data_v1$sui8))] = mean(data_v1$sui8, na.rm = TRUE)
+data_v1$drog1[which(is.na(data_v1$drog1))] = mean(data_v1$drog1, na.rm = TRUE)
+data_v1$drog2[which(is.na(data_v1$drog2))] = mean(data_v1$drog2, na.rm = TRUE)
+data_v1$drog3[which(is.na(data_v1$drog3))] = mean(data_v1$drog3, na.rm = TRUE)
+data_v1$drog4[which(is.na(data_v1$drog4))] = mean(data_v1$drog4, na.rm = TRUE)
+summary(data_v1)
+```
+
+
+On recode (SEULEMENT ?) la variable `sui8` en variable binaire qu'on nomme `tentative_suicide`
 
 ```{r}
-
+# sui1 et sui 8 
+# Code binaire 1 = oui ; 0 = non
+attach(data_v1)
+tentative_suicide <- factor(ifelse(sui8 <= 1, "Oui", "Non"))
+df <- data.frame(data_v1, tentative_suicide)
 ```
+
+On utilise maintenant la fonction `tree()` pour créer un arbre de classification afin de prédire `tentative_suicide` en utilisant toutes les variables sauf `suiu8`. La syntaxe de la fonction `tree()` est assez similaire à celle de la fonction `lm()`.
+
+```{r chunk4}
+tree.data <- tree(tentative_suicide ~ . -sui8, df)
+```
+
+La fonction `summary()` liste les variables utilisées comme noeuds internes de l'arbre, le nombre de noeuds terminaux et le taux d'erreur (d'entrainement).
+
+```{r chunk5}
+summary(tree.data, rate = TRUE)
+```
+
+On observe que le taux d'erreur d'entrainement est de 6%.
+
+Pour les arbres de classification, la déviance rapportée dans la sortie de `summary()` est donnée par $$
+-2 \sum_m \sum_k n_{mk} \log \hat{p}_{mk},
+$$ où $n_{mk}$ est le nombre d'observations du $m$ème noeud terminal qui appartiennent à la $k$ème classe.
+Une faible déviance indique un arbre qui offre une bonne adéquation aux données (d'entraînement).
+La *déviance moyenne résiduelle* rapportée est simplement la déviance divisée par $n-|{T}_0|$, qui dans ce cas est de 304-10=294.
+
+
+On utilise la fonction `plot()` pour afficher la structure de l'arbre, et la fonction `text()` pour afficher les étiquettes des noeuds.
+
+L'argument `pretty = 0` indique à `R` d'inclure les noms de catégories pour tous les prédicteurs qualitatifs, plutôt que de simplement afficher une lettre pour chaque catégorie.
+
+```{r polt1}
+plot(tree.data)
+text(tree.data, pretty = 0)
+```
+
+L'indicateur le plus important de `sui8` semble être l'emplacement des rayonnages, puisque la première branche différencie les emplacements inférieurs à la valeur 1.28 et ceux supérieurs à 1.28.
+
+
+Si on tape simplement le nom de l'objet arbre, `R` imprime la sortie correspondant à chaque branche de l'arbre.
+`R` affiche le critère de division (par exemple, `ddrog2 < 2.27`), le nombre d'observations dans cette branche, la déviance, la prédiction globale pour la branche (`Oui` ou `Non`) et la fraction d'observations dans cette branche qui prennent les valeurs `Oui` et `Non`.
+Les branches qui représentent des noeuds terminaux sont indiquées par des astérisques.
+
+```{r chunk7}
+tree.data
+```
+
+Afin d'évaluer correctement la performance d'un arbre de classification sur ces données, on doit estimer l'erreur de test plutôt que de simplement calculer l'erreur d'apprentissage.
+
+On divise donc les observations en un ensemble d'entraînement et un ensemble de test, on construit l'arbre en utilisant l'ensemble d'entraînement, et on évalue sa performance sur les données de test.
+On utilise pour cela la fonction `predict()`.
+
+```{r chunk8}
+set.seed(2)
+entrainement <- sample(1:nrow(df), 200)
+df.test <- df[-entrainement, ]
+tentative_suicide.test <- tentative_suicide[-entrainement]
+tree_data <- tree(tentative_suicide ~ . - sui8, df, subset = entrainement)
+tree.prediction <- predict(tree.data, df.test,
+    type = "class")
+table(tree.prediction, tentative_suicide.test)
+
+(84 + 4) / 200
+```
+
+Dans le cas d'un arbre de classification, l'argument `type = "class"` indique à `R` de renvoyer la prédiction de classe réelle.
+
+Cette approche permet d'obtenir des prédictions correctes pour environ 44% des emplacements de l'ensemble de données de test.
+
+(Si on exécute à nouveau la fonction `predict()`, on peut obtenir des résultats légèrement différents, en raison "d'égalités": par exemple, cela peut se produire lorsque les observations d'apprentissage correspondant à un noeud terminal sont réparties de manière égale entre les valeurs de réponse `Oui` et `Non`).
+
+Ensuite, on examine si l'élagage de l'arbre peut permettre d'améliorer les résultats.
+
+La fonction `cv.tree()` effectue une validation croisée afin de déterminer le niveau optimal de complexité de l'arbre ; l'élagage par la complexité des coûts (*cost complexity pruning*) est utilisé afin de sélectionner une séquence d'arbres à prendre en compte.
+
+On utilise l'argument `FUN = prune.misclass` pour indiquer qu'on veut que le taux d'erreur de classification guide le processus de validation croisée et d'élagage, plutôt que la valeur par défaut de la fonction `cv.tree()`, qui est la déviance.
+La fonction `cv.tree()` indique le nombre de noeuds terminaux de chaque arbre considéré (`size`) ainsi que le taux d'erreur correspondant et la valeur du paramètre de coût-complexité utilisé (`k`).
+
+```{r chunk9}
+set.seed(7)
+cv.df <- cv.tree(tree_data, FUN = prune.misclass)
+names(cv.df)
+cv.df
+```
+
+MAlgré son nom, `dev` corresponds aux nombre d'erreur de validation croisée cross-validation errors.
+L'arbre avec 9 noeuds terminaux ne donne lieu qu'à 74 erreurs de validation croisée.
+On visualise ensuite le taux d'erreur en fonction de `size` et de`k`.
+
+PROBLÈME DANS LE CHUNK PLUS HAUT
+
+
+```{r chunk10}
+par(mfrow = c(1, 2))
+plot(cv.df$size, cv.df$dev, type = "b")
+plot(cv.df$k, cv.df$dev, type = "b")
+```
+
+On applique maintenant la fonction `prune.misclass()` afin d'élaguer l'arbre pour obtenir l'arbre à neuf noeuds.
+
+```{r chunk11}
+prune.df <- prune.misclass(tree_data, best = 9)
+plot(prune.df)
+text(prune.df, pretty = 0)
+```
+
+Quelle est la performance de cet arbre élagué sur l'ensemble de données de test ?
+Une fois de plus, on utilise la fonction `predict()`.
+
+```{r chunk12}
+tree.prediction <- predict(prune.df, df.test,
+    type = "class")
+table(tree.prediction, tentative_suicide.test)
+( 89 + 4) / 200
+```
+
+Maintenant, 46.5% des observations de test sont correctement classées, donc non seulement le processus d'élagage a produit un arbre plus interprétable, mais il a aussi légèrement amélioré la précision de la classification.
+
+Si on augmente la valeur de `best`, on obtiens un arbre élagué plus grand avec une précision de classification plus faible :
+
+```{r chunk13}
+prune.df <- prune.misclass(tree_data, best = 14)
+plot(prune.df)
+text(prune.df, pretty = 0)
+tree.prediction <- predict(prune.df, df.test,
+    type = "class")
+table(tree.prediction, tentative_suicide.test)
+(84 + 4) / 200
+```
+
+
+
 
