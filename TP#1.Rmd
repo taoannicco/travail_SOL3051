@@ -1,0 +1,387 @@
+---
+title: "SOL3051 - TP1"
+author: "Juliana Hubacova, matricule 20148619 \n Nicolas Vaxelaire, 20193475 "
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+library(mice)
+library(tidyverse)
+library(glmnet)
+library(dplyr)
+library(ggplot2)
+library(CUFF)
+library(haven)
+library(knitr)
+library(xtable)
+library(pairwise)
+library(latex2exp)
+```
+
+1. Importation des données
+
+```{r message=FALSE, error=FALSE}
+# Importation données
+#input_data <- read.csv("~/Desktop/Hiver 2023/SOL3051/TP1/Donnees_these_Lacourse.csv" , na.strings = c("#NULL!", "NA"))
+#ou
+input_data <- read.csv("Donnees_these_Lacourse.csv", na.strings = c("#NULL!", "NA"))
+```
+
+2. Sélection des variables
+
+```{r pressure, echo=FALSE}
+# Sélection des variables
+
+data_v1 <- input_data[c("age", "travp","travm", "negp9", "negm9", "dets4", "dets13", "deta4", "deta13", "mus2", 
+         "muspre", "mustemp", "mushr", "alien1", "alien2", "sui1", "sui8", "drog1","drog2", "drog3", "drog4")]
+
+```
+
+3. Imputation
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Imputation
+summary(data_v1)
+data_v1$travp[which(is.na(data_v1$travp))] = mean(data_v1$travp, na.rm = TRUE)
+data_v1$travm[which(is.na(data_v1$travm))] = mean(data_v1$travm, na.rm = TRUE)
+data_v1$negp9[which(is.na(data_v1$negp9))] = mean(data_v1$negp9, na.rm = TRUE)
+data_v1$dets4[which(is.na(data_v1$dets4))] = mean(data_v1$dets4, na.rm = TRUE)
+data_v1$dets13[which(is.na(data_v1$dets13))] = mean(data_v1$dets13, na.rm = TRUE)
+data_v1$deta4[which(is.na(data_v1$deta4))] = mean(data_v1$deta4, na.rm = TRUE)
+data_v1$deta13[which(is.na(data_v1$deta13))] = mean(data_v1$deta13, na.rm = TRUE)
+data_v1$mus2[which(is.na(data_v1$mus2))] = mean(data_v1$mus2, na.rm = TRUE)
+data_v1$muspre[which(is.na(data_v1$muspre))] = mean(data_v1$muspre, na.rm = TRUE)
+data_v1$mustemp[which(is.na(data_v1$mustemp))] = mean(data_v1$mustemp, na.rm = TRUE)
+data_v1$mushr[which(is.na(data_v1$mushr))] = mean(data_v1$mushr, na.rm = TRUE)
+data_v1$alien1[which(is.na(data_v1$alien1))] = mean(data_v1$alien1, na.rm = TRUE)
+data_v1$alien2[which(is.na(data_v1$alien2))] = mean(data_v1$alien2, na.rm = TRUE)
+data_v1$sui1[which(is.na(data_v1$sui1))] = mean(data_v1$sui1, na.rm = TRUE)
+data_v1$sui8[which(is.na(data_v1$sui8))] = mean(data_v1$sui8, na.rm = TRUE)
+data_v1$drog1[which(is.na(data_v1$drog1))] = mean(data_v1$drog1, na.rm = TRUE)
+data_v1$drog2[which(is.na(data_v1$drog2))] = mean(data_v1$drog2, na.rm = TRUE)
+data_v1$drog3[which(is.na(data_v1$drog3))] = mean(data_v1$drog3, na.rm = TRUE)
+data_v1$drog4[which(is.na(data_v1$drog4))] = mean(data_v1$drog4, na.rm = TRUE)
+summary(data_v1)
+```
+
+4. Recodage des variables
+
+```{r}
+# Recodage TRAVP
+# Code binaire = 1 si père en vie et 0 si père décédé
+data_v2 =  data_v1 |>  
+  mutate(travp = ifelse(travp == '8', 0, 1))
+
+# Recodage TRAVM
+# Code binaire = 1 si mère en vie et 0 si mère décédée
+data_v2 = data_v2 |> 
+  mutate(travm = ifelse(travm == '8', 0, 1))
+
+# NEGP9 et NEGM9
+# Code binaire = 1 si souvent et = si jamais ou rarement
+data_v2 = data_v2 |> 
+  mutate(negp9 = ifelse(negp9 == "1" | negp9 == "2", 0, 1))
+data_v2 = data_v2 |> 
+  mutate(negm9 = ifelse(negm9 == "1" | negm9 == "2", 0, 1))
+
+# DETS4 et DETS13
+# Code binaire = 1 si c'est déjà arrivé et = 0 si jamais
+data_v2 = data_v2 |>  
+  mutate(dets4 = ifelse(dets4 == '1'|dets4 == '2'|dets4 == '3', 1, 0))
+data_v2 = data_v2 |> 
+  mutate(dets13 = ifelse(dets13 == '1'|dets13 == '2'|dets13 == '3', 1, 0))
+
+# DETA4 et DETA13
+# Code binaire = 1 si c'est déjà arrivé et = 0 si jamais
+data_v2 = data_v2 |>  
+  mutate(deta4 = ifelse(deta4 == '1'|deta4 == '2'|deta4 == '3', 1, 0))
+data_v2 = data_v2 |>  
+  mutate(deta13 = ifelse(deta13 == "1" | deta13 == "2" | deta13 == "3", 1, 0))
+
+# MUS2
+# Code binaire = 1 si aime le Heavy Metal et = 0 sinon
+data_v2 = data_v2 |>  
+  mutate(mus2 = ifelse(mus2 == '4' | mus2 == '5', 1, 0))
+
+# MUSPRE
+# Code binaire = 1 si c'est le Heavy Metal et = 0 sinon
+data_v2 = data_v2 |> 
+  mutate(muspre = ifelse(muspre == '2', 1, 0))
+
+
+# alien1 et alien 2
+# Code binaire 0 = désaccord ; 1 = accord
+data_v2 = data_v2 |> 
+  mutate(alien1 = ifelse(alien1 == "1" | alien1 == "2" | alien1 == "3", 0, 1))
+data_v2 = data_v2 |>  
+  mutate(alien2 = ifelse(alien2 == "1" | alien2 == "2" | alien2 == "3", 0, 1))
+
+# sui1 et sui 8 
+# Code binaire 1 = oui ; 0 = non
+data_v2 = data_v2 |>  
+  mutate(sui1 = ifelse(sui1 == "1", 1, 0))
+data_v2 = data_v2 |>  
+  mutate(sui8 = ifelse(sui8 == "1", 1, 0))
+
+# drog1, drog2, drog3, drog4
+# Codage binaire 0 = jamais ; 1 = min une fois
+data_v2 = data_v2 |>  
+  mutate(drog1 = ifelse(drog1 == "1", 0, 1))
+data_v2 = data_v2 |>  
+  mutate(drog2 = ifelse(drog2 == "1", 0, 1))
+data_v2 = data_v2 |>  
+  mutate(drog3 = ifelse(drog3 == "1", 0, 1))
+data_v2 = data_v2 |>  
+  mutate(drog4 = ifelse(drog4 == "1", 0, 1))
+```
+
+Échantillon séparé en deux sous-échantillons:
+
+1. Celui d’entraînement (entrainement.df ; N = 213) 
+2. Celui de test (test.df ; N = 91)
+
+```{r CRÉA-ÉCHANTILLON}
+#Diviser l'ensemble de données pour créer un sous-ensemble de données d'entrainement et un sous-ensemble de données de test (avec germe aléatoire pour assurer la reproductibilité des résultats)
+set.seed(1234)
+entrainement <- sample(1:304, 213)
+entrainement.df <- data_v2[entrainement,]
+test.df <- data_v2[-entrainement,]
+```
+
+
+```{r STANDARDISATION}
+#Standardisation des variables
+entrainement_scaled <- scale(entrainement.df[ ,unlist(lapply(entrainement.df, is.numeric))])
+
+test_scaled <- scale(test.df[ ,unlist(lapply(test.df, is.numeric))])
+
+entrainement_scaled <- as.data.frame(entrainement_scaled)
+test_scaled <- as.data.frame(test_scaled)
+```
+
+```{r VÉRIFICATION}
+#Lire l'ensemble de données d'entrainement pour vérifier la réussite de l'étape précédente
+ls(entrainement.df)
+
+#Lire l'ensemble de données de test pour vérifier la réussite de l'étape précédente
+ls(test.df)
+```
+
+```{r K-cross & function}
+#Division des données d'entrainement en 10 groupes de 70 individus (observations)
+PARTITION = sample(rep(1:8, rep(27,8)),213)
+
+#Création de la fonction crossval pour la validation croisée à 8-plis 
+crossval <- function(mod){
+  f1 <- function(x){
+    modi = update(mod, data = entrainement_scaled[!(PARTITION %in% x),])
+    table(1*(predict(modi, newdata = entrainement_scaled[PARTITION %in% x,],
+                     type = "resp")>0.5),
+          entrainement_scaled[(PARTITION %in% x),"sui8"])
+  }
+  CVT <- mapply(f1, x = 1:8)
+  as.table(matrix(apply(CVT, 1, sum), 2, 2,
+                  dimnames = list(c("P.ND","P.D"),
+                                  c("T.ND","T.D"))))
+}   
+```
+
+## modèle basic régression linéaire : 
+
+Tous les modèles on comme variable dépendante la variable 'sui8' et on utilise ici seulement l'échantillon d'entrainement.
+
+```{r VARIABLES SELON .DF ET NON SCALED}
+#mise en place des prédicteurs = toutes les VI sauf sui8 la VD (17ème variable)
+X <- data.matrix(entrainement.df[, c(-17)])
+X_test <- data.matrix(test.df[, c(-17)])
+#mise en place de la variable dep
+Y <- entrainement.df$sui8
+```
+
+```{r MODELE}
+mdl_base <- glmnet(x=X, y=Y, lambda = 0, family = "binomial", standardize = TRUE)
+print(mdl_base)
+mdl_ridge <- glmnet(X, Y, alpha = 0, standardize = TRUE)
+```
+
+
+```{r PRÉDICTION AVEC RÉGRESSION LOGISTIQUE CLASSIQUE }
+predict(mdl_base, type = "coef", "lambda.min", allCoef = TRUE)
+mdl_base_pred <- predict(mdl_base, newx = X, s = "lambda.min")
+table_class <- table(1*(mdl_base_pred>0),Y)
+sprintf("Le modèle de régression classique produit %.1f%% de bonne classification", sum(diag(prop.table(table_class)))*100)
+```
+
+
+# Ridge : 
+
+```{r RIDGE ET VALIDATION CROISÉE}
+#pour comparaison :
+mdl_base <- glmnet(x=X, y=Y, lambda = 0, family = "binomial", standardize = TRUE)
+
+
+# Erreur quadratique moyenne (EQM) : création d'un lambda optimal avec validation croisée en k-fold pour avoir une EQM la plus petite possible  
+
+cv_modele_ridge <- cv.glmnet(x=X, y=Y, alpha = 0, standardize = TRUE, nfolds = 8, foldid = PARTITION, intercept = TRUE, family = "binomial")
+optimal_lambda_ridge <- cv_modele_ridge$lambda.min
+
+sprintf("Le lambda doit être d'une valeur d'environ %1f pour minimiser le test d'EQM", optimal_lambda_ridge)
+```
+
+
+```{r RIDGE-graph}
+# on créé un graphique représentant l’EQM d’essai selon la valeur du lambda
+plot(cv_modele_ridge)
+```
+
+
+```{r RIDGE-analyse}
+# analyser le modèle final 
+model_final_ridge <- glmnet(x=X, y=Y, alpha = 0, family = "binomial", standardize = TRUE, lambda = optimal_lambda_ridge)
+coef(model_final_ridge)
+```
+
+
+
+```{r RIDGE-graph2}
+#visualisation du changement des estimations de coefficient selon la valeur de lambda :
+plot(mdl_ridge, xvar = "lambda", xlab = ~log(lambda))+abline(v = log(cv_modele_ridge$lambda.min), col = "red", lty = 2)
+# plot à améliorer avec FAS1003
+```
+
+```{r RIDGE-R¨2}
+#mise en place des prédicteurs et de la  variable dépendante selon l'échantillon test
+X_test <- data.matrix(test.df[, c(-17)])
+Y_test <- test.df$sui8
+
+predicted_y <- predict(model_final_ridge, s = optimal_lambda_ridge, newx = X_test)
+
+# Calculer le coefficient de détermination (R²)
+SST <- sum((Y_test - mean(Y_test))^2)  # Somme des carrés totaux
+SSR <- sum((predicted_y - mean(Y_test))^2)  # Somme des carrés de la régression
+R_squared <- SSR/SST
+
+sprintf("Ce modèle ridge permet donc d'expiquer %.1f%% de la variation des valeurs de l'échantillon d'entrainement est expliquée par ce modèle", R_squared)
+```
+
+
+# LASSO : 
+
+```{r LASSO ET VALIDATION CROISÉE}
+# Erreur quadratique moyenne (EQM) : création d'un lambda optimal avec validation croisée en k-fold pour avoir une EQM la plus petite possible   
+
+cv_modele_lasso <- cv.glmnet(x=X, y=Y, alpha = 1, standardize = TRUE, nfolds = 8, foldid = PARTITION, family = "binomial")
+
+optimal_lambda_lasso <- cv_modele_lasso$lambda.min
+log(optimal_lambda_lasso)
+mdl_lasso <- glmnet(x=X, y=Y, alpha = 1, standardize = TRUE, family = "binomial", lambda = cv_modele_lasso$lambda.min)
+
+sprintf("Le lambdda doit être d'une valeur de %1f pour minimiser le test EQM.", optimal_lambda_lasso)
+
+```
+
+
+```{r LASSO-graph}
+# on créé un graphique représentant l’EQM d’essai selon la valeur du lambda
+plot(cv_modele_lasso)
+```
+
+```{r LASSO ET VALIDATION CROISÉE2}
+mdl_lasso.0 <- glmnet(x=X,y=Y, alpha = 1, family = "binomial")
+plot(mdl_lasso.0, xvar = "lambda", xlab = ~log(optimal_lambda_lasso))+ abline(v = log(cv_modele_lasso$lambda.min), lty = 2, col = "red")
+```
+
+
+
+```{r LASSO-analyse}
+# analyser le modèle final 
+model_final_lasso <- glmnet(X, Y, alpha = 1, standardize = TRUE, lambda = optimal_lambda_lasso)
+coef(model_final_lasso)
+```
+
+
+```{r LASSO-R¨2}
+#Rcarré du modèle avec l'échantillon d'entrainement :
+Y_pred <- predict(model_final_lasso, s = optimal_lambda_lasso, newx = X)
+#SST et SSE
+sst <- sum((Y - mean(Y))^2)
+sse <- sum((Y_pred - Y)^2)
+#Rcarré
+rsq <- 1 - sse/sst
+
+
+sprintf("Ce modèle permet donc d'expliquer %.1f%% de la variation des valeurs de l'échantillon d'entrainement", rsq*100)
+
+```
+
+
+```{r ÉLASTIC-NET & VALIDATION CROISÉE, warning=FALSE}
+layout(matrix(1:10,3,3, byrow = TRUE))
+
+cv_modele_elastic <- list()
+
+for(al in seq(0.1,0.9,0.1)){cv_modele_elastic[[sprintf("%1.f",al)]] <- cv.glmnet(x=X,y=Y, nfolds = 8, standardize=TRUE, foldid = PARTITION, alpha = al, family ="binomial")
+  
+plot(cv_modele_elastic[[sprintf("%1.f",al)]], 
+main = latex2exp::TeX(sprintf("$\\alpha = %.1f",al)), ylim =c(0.3,1), xlim = c(-8,-2))
+}
+```
+
+```{r PERF ELASTICNET}
+modele_elastic_net <- glmnet(x=X,y=Y, alpha = 0.1, family ="binomial", lambda = cv_modele_elastic[[2.9]]$lambda.min, newx = X)
+elastic_net_pred <- predict(cv_modele_elastic[[2.9]], newx = X)
+VC <- table(1*(elastic_net_pred>0),entrainement.df$sui8)
+Z <- sum(diag(prop.table(VC)))*100
+sprintf("la performance prédictive du modèle elastic-net est de %.1f%% en dégré de bonnes classification",Z)
+```
+
+```{r PRED MDLS}
+#Validation des prédictions faites à partir de ce modèle elastic-net et des données d'entrainement, en utilisant l'échantillon test
+mdl_base_tp <- predict(mdl_base, newx = X_test, s = "lambda.min")
+mdl_ridge_tp <- predict(cv_modele_ridge, newx = X_test, s ="lambda.min")
+mdl_lasso_tp <-predict(cv_modele_lasso, newx = X_test, s ="lambda.min")
+mdl_elasticnet_tp <- predict(cv_modele_elastic[[2.9]], newx = X_test, s = "lambda.min")
+```
+
+```{r ANALYSE DES CLASSIFICATIONS SUR LES DONNEES TEST}
+VCT1 <- table(1*(mdl_base_tp>0),Y_test)
+T1 <- prop.table(VCT1)
+sprintf("Le modèle de régression de base détient %.1f%% de bonnes classifications sur les données de l'échantillon test.", sum(diag(T1))*100)
+VCT2 <- table(1*(mdl_ridge_tp >0),Y_test)
+T2 <- prop.table(VCT2)
+sprintf("Le modèle de régression avec régularisation de Ridge détient %.1f%% de bonnes classifications sur les données de l'échantillon test.", sum(diag(T2))*100)
+VCT3 <- table(1*(mdl_lasso_tp >0),Y_test)
+T3 <- prop.table(VCT3)
+sprintf("Le modèle de régression avec régularisation Lasso détient %.1f%% de bonnes classifications sur les données de l'échantillon test.", sum(diag(T3))*100)
+VCT4 <- table(1*(mdl_elasticnet_tp >0),Y_test)
+T4 <- prop.table(VCT4)
+sprintf("Le modèle de régression avec régularisation elastic-net détient %.1f%% de bonnes classifications sur les données de l'échantillon test.", sum(diag(T4))*100)
+```
+
+```{r}
+variable_modele <- c("age","travp","travm","negp9","negm9","dets4","dets13","deta4","deta13","mus2","muspre","mustemp","mushr","alien1","alien2","sui1","drog1","drog2","drog3","drog4")
+
+length(drop(coef(cv_modele_elastic[[2.9]],
+                 s ="lambda.min",allCoef = TRUE)))
+
+coef(cv_modele_elastic[[2.9]], s = "lambda.min", allCoef = TRUE)
+
+coefficients <- data.frame(Variables = c("Intercept", variable_modele),
+                           REG.LIN = drop(coef(mdl_base, s = "lambda.min", allCoef = TRUE)),
+                           RIDGE = drop(coef(cv_modele_ridge , s = "lambda.min", allCoef = TRUE)),
+                           LASSO = drop(coef(cv_modele_lasso , s = "lambda.min", allCoef = TRUE)),
+                           ELASTIC.NET = drop(coef(cv_modele_elastic[[2.9]], s = "lambda.min", allCoef = TRUE)))
+
+kable(coefficients, digits = 2, row.names = FALSE)
+
+                
+```
+
+
+
+
+
+
+
