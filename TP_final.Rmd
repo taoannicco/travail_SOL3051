@@ -7,6 +7,8 @@ date: "2023-04-05"
 
 ```{r Packages}
 #install.packages("tree")
+#install.packages("gbm")
+library(partykit)
 library(tree)
 library(mice)
 library(tidyverse)
@@ -20,6 +22,7 @@ library(xtable)
 library(pairwise)
 library(latex2exp)
 library(ISLR2)
+library(gbm)
 ```
 
 ## Arbres de classifications : 
@@ -41,7 +44,6 @@ input_data <- read.csv("Donnees_these_Lacourse.csv", na.strings = c("#NULL!", "N
 
 ```{r pressure, echo=FALSE}
 # Sélection des variables
-
 data_v1 <- input_data[c("age", "travp","travm", "negp9", "negm9", "dets4", "dets13", "deta4", "deta13", "mus2", 
          "muspre", "mustemp", "mushr", "alien1", "alien2", "sui1", "sui8", "drog1","drog2", "drog3", "drog4")]
 
@@ -82,19 +84,19 @@ On recode (SEULEMENT ?) la variable `sui8` en variable binaire qu'on nomme `tent
 # Code binaire 1 = oui ; 0 = non
 attach(data_v1)
 tentative_suicide <- factor(ifelse(sui8 <= 1, "Oui", "Non"))
-df <- data.frame(data_v1, tentative_suicide)
+data_v1 <- data.frame(data_v1, tentative_suicide)
 ```
 
-On utilise maintenant la fonction `tree()` pour créer un arbre de classification afin de prédire `tentative_suicide` en utilisant toutes les variables sauf `suiu8`. La syntaxe de la fonction `tree()` est assez similaire à celle de la fonction `lm()`.
+On utilise maintenant la fonction `tree()` pour créer un arbre de classification afin de prédire `tentative_suicide` en utilisant toutes les variables sauf `sui8`. La syntaxe de la fonction `tree()` est assez similaire à celle de la fonction `lm()`.
 
 ```{r chunk4}
-tree.data <- tree(tentative_suicide ~ . -sui8, df)
+tree.data.v1 <- tree(tentative_suicide ~ . - sui8, data_v1)
 ```
 
 La fonction `summary()` liste les variables utilisées comme noeuds internes de l'arbre, le nombre de noeuds terminaux et le taux d'erreur (d'entrainement).
 
 ```{r chunk5}
-summary(tree.data, rate = TRUE)
+summary(tree.data.v1)
 ```
 
 On observe que le taux d'erreur d'entrainement est de 6%.
@@ -111,8 +113,8 @@ On utilise la fonction `plot()` pour afficher la structure de l'arbre, et la fon
 L'argument `pretty = 0` indique à `R` d'inclure les noms de catégories pour tous les prédicteurs qualitatifs, plutôt que de simplement afficher une lettre pour chaque catégorie.
 
 ```{r polt1}
-plot(tree.data)
-text(tree.data, pretty = 0)
+plot(tree.data.v1)
+text(tree.data.v1, pretty = 0)
 ```
 
 L'indicateur le plus important de `sui8` semble être l'emplacement des rayonnages, puisque la première branche différencie les emplacements inférieurs à la valeur 1.28 et ceux supérieurs à 1.28.
@@ -123,7 +125,7 @@ Si on tape simplement le nom de l'objet arbre, `R` imprime la sortie corresponda
 Les branches qui représentent des noeuds terminaux sont indiquées par des astérisques.
 
 ```{r chunk7}
-tree.data
+tree.data.v1
 ```
 
 Afin d'évaluer correctement la performance d'un arbre de classification sur ces données, on doit estimer l'erreur de test plutôt que de simplement calculer l'erreur d'apprentissage.
@@ -133,13 +135,14 @@ On utilise pour cela la fonction `predict()`.
 
 ```{r chunk8}
 set.seed(2)
-entrainement <- sample(1:nrow(df), 200)
-df.test <- df[-entrainement, ]
-tentative_suicide.test <- tentative_suicide[-entrainement]
-tree_data <- tree(tentative_suicide ~ . - sui8, df, subset = entrainement)
-tree.prediction <- predict(tree.data, df.test,
-    type = "class")
-table(tree.prediction, tentative_suicide.test)
+train <- sample(1:nrow(data_v1), 200)
+data_v1.test <- data_v1[-train, ]
+suicide.test <- tentative_suicide[-train]
+tree.data.v1 <- tree(tentative_suicide ~ . - sui8, data_v1,
+                      subset = train)
+tree.pred <- predict(tree.data.v1, data_v1.test,
+                     type = "class")
+table(tree.pred, suicide.test)
 
 (84 + 4) / 200
 ```
@@ -159,7 +162,7 @@ La fonction `cv.tree()` indique le nombre de noeuds terminaux de chaque arbre co
 
 ```{r chunk9}
 set.seed(7)
-cv.df <- cv.tree(tree_data, FUN = prune.misclass)
+cv.df <- cv.tree(tree.data.v1, FUN = prune.misclass)
 names(cv.df)
 cv.df
 ```
@@ -180,7 +183,7 @@ plot(cv.df$k, cv.df$dev, type = "b")
 On applique maintenant la fonction `prune.misclass()` afin d'élaguer l'arbre pour obtenir l'arbre à neuf noeuds.
 
 ```{r chunk11}
-prune.df <- prune.misclass(tree_data, best = 9)
+prune.df <- prune.misclass(tree.data.v1, best = 9)
 plot(prune.df)
 text(prune.df, pretty = 0)
 ```
@@ -189,10 +192,11 @@ Quelle est la performance de cet arbre élagué sur l'ensemble de données de te
 Une fois de plus, on utilise la fonction `predict()`.
 
 ```{r chunk12}
-tree.prediction <- predict(prune.df, df.test,
+tree.prediction <- predict(prune.df, data_v1.test,
     type = "class")
-table(tree.prediction, tentative_suicide.test)
-( 89 + 4) / 200
+table(tree.prediction, suicide.test)
+
+(89 + 4) / 200
 ```
 
 Maintenant, 46.5% des observations de test sont correctement classées, donc non seulement le processus d'élagage a produit un arbre plus interprétable, mais il a aussi légèrement amélioré la précision de la classification.
@@ -200,13 +204,13 @@ Maintenant, 46.5% des observations de test sont correctement classées, donc non
 Si on augmente la valeur de `best`, on obtiens un arbre élagué plus grand avec une précision de classification plus faible :
 
 ```{r chunk13}
-prune.df <- prune.misclass(tree_data, best = 14)
+prune.df <- prune.misclass(tree.data.v1, best = 9)
 plot(prune.df)
 text(prune.df, pretty = 0)
-tree.prediction <- predict(prune.df, df.test,
+tree.prediction <- predict(prune.df, data_v1.test,
     type = "class")
-table(tree.prediction, tentative_suicide.test)
-(84 + 4) / 200
+table(tree.prediction, suicide.test)
+(89 + 4) / 200
 ```
 
 
