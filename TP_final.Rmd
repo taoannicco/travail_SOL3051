@@ -117,7 +117,7 @@ plot(tree.data.v1)
 text(tree.data.v1, pretty = 0)
 ```
 
-L'indicateur le plus important de `sui8` semble être l'emplacement des rayonnages, puisque la première branche différencie les emplacements inférieurs à la valeur 1.28 et ceux supérieurs à 1.28.
+L'indicateur le plus important de `sui1` semble être l'emplacement des rayonnages, puisque la première branche différencie les emplacements inférieurs à la valeur 1.28 et ceux supérieurs à 1.28.
 
 
 Si on tape simplement le nom de l'objet arbre, `R` imprime la sortie correspondant à chaque branche de l'arbre.
@@ -168,10 +168,10 @@ cv.df
 ```
 
 MAlgré son nom, `dev` corresponds aux nombre d'erreur de validation croisée cross-validation errors.
-L'arbre avec 9 noeuds terminaux ne donne lieu qu'à 74 erreurs de validation croisée.
-On visualise ensuite le taux d'erreur en fonction de `size` et de`k`.
+L'arbre avec 12 noeuds terminaux ne donne lieu qu'à 23 erreurs de validation croisée. Ce chiffre équivaut à la somme des carrés des erreurs pour chaque valeurs de compléxité ou size. 
 
-PROBLÈME DANS LE CHUNK PLUS HAUT
+On visualise ensuite le taux d'erreur en fonction de `size` et de`k`. Il y a un seul groupe pour un degré de compléxité de 6 noeuds dans la validation croisée
+
 
 
 ```{r chunk10}
@@ -180,10 +180,10 @@ plot(cv.df$size, cv.df$dev, type = "b")
 plot(cv.df$k, cv.df$dev, type = "b")
 ```
 
-On applique maintenant la fonction `prune.misclass()` afin d'élaguer l'arbre pour obtenir l'arbre à neuf noeuds.
+On applique maintenant la fonction `prune.misclass()` afin d'élaguer l'arbre pour obtenir l'arbre à 12 noeuds.
 
 ```{r chunk11}
-prune.df <- prune.misclass(tree.data.v1, best = 9)
+prune.df <- prune.misclass(tree.data.v1, best = 12)
 plot(prune.df)
 text(prune.df, pretty = 0)
 ```
@@ -214,5 +214,229 @@ table(tree.prediction, suicide.test)
 ```
 
 
+## Arbres de régression : 
+
+
+```{r chunk14}
+set.seed(1)
+train <- sample(1:nrow(data_v1), nrow(data_v1) / 2)
+
+tree.data.v1 <- tree(tentative_suicide ~ . -sui8, data_v1, subset = train)
+
+summary(tree.data.v1)
+```
+
+Remarquez que la sortie de `summary()` indique que seules quatre des variables ont été utilisées pour construire l'arbre.
+Dans le contexte d'un arbre de régression, la déviance est simplement la somme des erreurs au carré pour l'arbre.
+On visualise maintenant l'arbre.
+
+```{r chunk15}
+plot(tree.data.v1)
+text(tree.data.v1, pretty = 0)
+```
+
+La variable `lstat` mesure le pourcentage de personnes ayant un statut socio-économique faible, tandis que la variable `rm` correspond au nombre moyen de pièces.
+L'arbre indique que des valeurs plus grandes de `rm`, ou des valeurs plus faibles de `lstat` correspondent à des maisons plus chères.
+Par exemple, l'arbre prédit un prix médian de 45 400\$ pour les maisons situées dans les secteurs de recensement dans lesquels `rm >= 7,553`.
+
+Il est intéressant de noter qu'on aurait pu créer un arbre beaucoup plus grand, en utlissant l'argument `control = tree.control(nobs = length(train), mindev = 0)` dans la fonction `tree()`.
+
+On utilise maintenant la fonction `cv.tree()` pour voir si l'élagage de l'arbre améliore sa performance.
+
+```{r chunk16}
+cv.data.v1 <- cv.tree(tree.data.v1)
+plot(cv.data.v1$size, cv.data.v1$dev, type = "b")
+```
+
+Dans ce cas, l'arbre le plus complexe considéré est sélectionné par validation croisée.
+Cependant, si on veut élaguer l'arbre, on peut le faire en utilisant la fonction `prune.tree()` :
+
+```{r chunk17}
+prune.data.v1 <- prune.tree(tree.data.v1, best = 8)
+plot(prune.data.v1)
+text(prune.data.v1, pretty = 0)
+```
+Les prunning a des résultats similaires 
+
+
+Conformément aux résultats de la validation croisée, on utilise l'arbre non élagué pour faire des prédictions sur l'ensemble de test.
+
+```{r chunk18}
+yhat <- predict(tree.data.v1, newdata = data_v1[-train,])
+
+data.v1.test <- data_v1[-train, "sui8"]
+
+yhat <- sample(yhat, size = 152, replace = FALSE)
+
+plot(yhat, data.v1.test)
+abline(0, 1)
+sprintf("L'erreur résiduelle (MSE) de l'ensemble de test associée à l'arbre de régression est de %.1f%%", mean((yhat - data.v1.test)^2))
+```
+
+
+
+
+
+
+
+
+## Bagging et forêts aléatoires
+
+On applique la procédure de *bagging* et les forêts aléatoires aux données de `Data_v1`, en utilisant la bibliothèque `randomForest` dans `R`.
+
+Les résultats exacts obtenus dans cette section peuvent dépendre de la version de `R` et de la version du paquet `randomForest` installée sur votre ordinateur.
+
+Rappelez-vous que le *bagging* est simplement un cas particulier de forêt aléatoire avec `m=p`.
+Par conséquent, la fonction `randomForest()` peut être utilisée pour effectuer à la fois les forêts aléatoires et le *bagging*.
+On commence par faire le *bagging*
+
+Pour les étapes préliminaires, nous avions besoin de la variable tentative_suicide afin d'avoir une variable codée Oui ou Non selon les résultats pour sui8. Pour le reste de l'étude, nous n'avons plus besoin de cette dernière et nous la soustrairons aux modèles observés.
+
+```{r chunk19}
+#install.packages("randomForest")
+library(randomForest)
+```
+
+
+```{r chunk19/2}
+set.seed(1)
+bag.data.v1 <- randomForest(sui8 ~ . -tentative_suicide, data = data_v1,
+    subset = train, mtry = 20, importance = TRUE)
+
+bag.data.v1
+
+```
+
+L'argument `mtry = 20` indique que les 20 prédicteurs doivent tous être pris en compte pour chaque division de l'arbre - en d'autres termes, que le *bagging* doit être effectuée.
+
+Quelle est la performance de ce modèle avec *bagging* sur l'ensemble de test ?
+
+
+
+La MSE de l'ensemble de test associé à l'arbre de régression avec *bagging* est de 23,42, soit environ deux tiers de ce qu'on avait obtenu à l'aide d'un arbre unique à élagage optimal.
+On peut modifier le nombre d'arbres cultivés par `randomForest()` en utilisant l'argument `ntree` :
+
+
+
+```{r chunk21}
+bag.data.v1 <- randomForest(sui8 ~ .-tentative_suicide, data = data_v1,
+    subset = train, mtry = 20, ntree = 25)
+yhat.bag <- predict(bag.data.v1, newdata = data_v1[-train, ])
+
+mean((yhat.bag - data.v1.test)^2)
+```
+
+L'utilisation d'une forêt aléatoire se déroule exactement de la même manière, sauf qu'on une valeur plus petite de l'argument `mtry`.
+Par défaut, `randomForest()` utilise $p/3$ variables lors de la construction d'une forêt aléatoire d'arbres de régression, et $\sqrt{p}$ variables lors de la construction d'une forêt aléatoire d'arbres de classification.
+Ici, on utilise `mtry = 6`.
+
+```{r chunk22}
+set.seed(1)
+rf.data.v1 <- randomForest(sui8 ~ .-tentative_suicide, data = data_v1,
+    subset = train, mtry = 20, importance = TRUE)
+yhat.rf <- predict(rf.data.v1, newdata = data_v1[-train, ])
+mean((yhat.rf - data.v1.test)^2)
+```
+
+La MSE de l'ensemble de test est de 20,07 ce qui indique que les forêts aléatoires ont permis une amélioration par rapport au *bagging* dans ce cas.
+
+En utilisant la fonction `importance()`, on peut voir l'importance de chaque variable.
+
+```{r chunk23}
+importance(rf.data.v1)
+```
+
+Deux mesures de l'importance des variables sont présentées.
+La première est basée sur la diminution moyenne de la précision des prédictions sur les échantillons hors sac lorsqu'une variable donnée est permutée.
+La seconde est une mesure de la diminution totale de l'impureté des noeuds qui résulte des divisions sur cette variable, en moyenne sur tous les arbres.
+Dans le cas des arbres de régression, l'impureté des noeuds est mesurée par le RSS de formation, et pour les arbres de classification par la déviance.
+On peut produire des graphiques de ces mesures d'importance à l'aide de la fonction `varImpPlot()`.
+
+```{r chunk24}
+varImpPlot(rf.data.v1)
+```
+
+Les résultats indiquent que pour tous les arbres considérés dans la forêt aléatoire, la richesse de la communauté (`lstat`) et la taille de la maison (`rm`) sont de loin les deux variables les plus importantes.
+
+
+
+
+## Boosting
+
+Pour le *boosting*, on utilise le paquet `gbm` et la fonction `gbm()` pour créer des arbres de régression boostés à l'ensemble de données `Boston`.
+On exécute `gbm()` avec l'option `distribution = "gaussian"` puisqu'il s'agit d'un problème de régression ; s'il s'agissait d'un problème de classification binaire, on utiliserait plutôt `distribution = "bernoulli"`.
+L'argument `n.trees = 5000` indique qu'on veut 5000 arbres, et l'option `interaction.depth = 4` limite la profondeur de chaque arbre.
+
+Étant donné que nous reconcentrons l'étude sur la variable sui8, la distribution ne sera pas de bernouilli mais plutôt gaussienne. 
+
+
+```{r chunk25}
+library(gbm)
+```
+
+
+```{r chunk25/2}
+set.seed(1)
+boost.data.v1 <- gbm(sui8 ~ .-tentative_suicide, data = data_v1[train, ],
+    distribution = "gaussian", n.trees = 5000,
+    interaction.depth = 4)
+```
+
+La fonction `summary()` produit un graphique d'influence relative et sort également les statistiques d'influence relative.
+
+```{r chunk26}
+summary(boost.data.v1)
+```
+
+Encore une fois on voit que `alien1` et `drog1` sont de loin les variables les plus importantes.
+On peut aussi produire des graphiques de dépendance partielle pour ces deux variables.
+Ces graphiques illustrent l'effet marginal des variables sélectionnées sur la réponse après avoir intégré les autres variables.
+Dans ce cas, comme nous pouvions nous y attendre, les prix médians des maisons augmentent avec `rm` et diminuent avec `lstat`.
+
+```{r chunk27}
+plot(boost.data.v1 , i = "alien1")
+plot(boost.data.v1, i = "drog1")
+```
+
+On utilise maintenant le modèle boosté pour prédire `SUI8` sur les données de test:
+
+```{r chunk28}
+yhat.boost <- predict(boost.data.v1,
+    newdata = data_v1[-train, ], n.trees = 5000)
+mean((yhat.boost - data.v1.test)^2)
+```
+
+La MSE de test obtenue est de 18.39 : c'est supérieur à l'erreur de test des forêts aléatoires et du bagging.
+Si on veut, on peut effectuer le boosting avec une valeur différente pour le paramètre de rétrécissement $\lambda$.
+La valeur par défaut est de 0.001, mais elle est facilement modifiable.
+Ici, on utilise $\lambda=0.2$.
+
+```{r chunk29}
+boost.data.v1 <- gbm(sui8 ~ .-tentative_suicide, data = data_v1[train, ],
+    distribution = "gaussian", n.trees = 5000,
+    interaction.depth = 4, shrinkage = 0.2, verbose = F)
+yhat.boost <- predict(boost.data.v1,
+    newdata = data_v1[-train, ], n.trees = 5000)
+mean((yhat.boost - data.v1.test)^2)
+```
+
+Dans ce cas-ci, utiliser $\lambda=0.2$ donne une plus petite erreur de test que $\lambda=0.001$.
+
+```{r BART}
+#install.packages("BART")
+library(BART)
+```
+
+
+```{r BART/2}
+x <- data_v1[, 1:21]
+y <- data_v1[, "sui8"]
+xtrain <- x[train,]
+ytrain <- y[train]
+xtest <- x[-train,]
+ytest <- x[-train]
+set.seed(1)
+bartfit <- gbart(xtrain, ytrain, x.test = xtest)
+```
 
 
