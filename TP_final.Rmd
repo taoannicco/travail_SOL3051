@@ -77,7 +77,7 @@ data_v1$drog3[which(is.na(data_v1$drog3))] = mean(data_v1$drog3, na.rm = TRUE)
 data_v1$drog4[which(is.na(data_v1$drog4))] = mean(data_v1$drog4, na.rm = TRUE)
 summary(data_v1)
 ```
-```{r statistiques déscriptives}
+```{r statistiques descriptives}
 install.packages("psych")
 library(psych)
 describe(data_v1)
@@ -373,12 +373,12 @@ mean((yhat.boost - data.v1.test)^2)
 La MSE de test obtenue est de 18.39 : c'est supérieur à l'erreur de test des forêts aléatoires et du bagging.
 Si on veut, on peut effectuer le boosting avec une valeur différente pour le paramètre de rétrécissement $\lambda$.
 La valeur par défaut est de 0.001, mais elle est facilement modifiable.
-Ici, on utilise $\lambda=0.2$.
+Ici, on utilise $\lambda=0.0015$.
 
 ```{r chunk29}
 boost.data.v1 <- gbm(sui8 ~ .-tentative_suicide, data = data_v1[train, ],
     distribution = "gaussian", n.trees = 5000,
-    interaction.depth = 4, shrinkage = 0.2, verbose = F)
+    interaction.depth = 4, shrinkage = 0.0015, verbose = F)
 yhat.boost <- predict(boost.data.v1,
     newdata = data_v1[-train, ], n.trees = 5000)
 mean((yhat.boost - data.v1.test)^2)
