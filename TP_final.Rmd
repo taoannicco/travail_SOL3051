@@ -77,6 +77,11 @@ data_v1$drog3[which(is.na(data_v1$drog3))] = mean(data_v1$drog3, na.rm = TRUE)
 data_v1$drog4[which(is.na(data_v1$drog4))] = mean(data_v1$drog4, na.rm = TRUE)
 summary(data_v1)
 ```
+```{r statistiques déscriptives}
+install.packages("psych")
+library(psych)
+describe(data_v1)
+```
 
 On recode la variable `sui8` en variable binaire qu'on nomme `tentative_suicide`.
 
@@ -228,6 +233,7 @@ Cependant, si on veut élaguer l'arbre, on peut le faire en utilisant la fonctio
 
 ```{r chunk17}
 prune.data.v1 <- prune.tree(tree.data.v1, best = 7)
+summary(prune.data.v1)
 plot(prune.data.v1)
 text(prune.data.v1, pretty = 0)
 ```
@@ -321,7 +327,6 @@ varImpPlot(rf.data.v1)
 ```
 
 Les résultats indiquent que pour tous les arbres considérés dans la forêt aléatoire, la richesse de la communauté (`lstat`) et la taille de la maison (`rm`) sont de loin les deux variables les plus importantes.
-
 ## Boosting
 
 Pour le *boosting*, on utilise le paquet `gbm` et la fonction `gbm()` pour créer des arbres de régression boostés à l'ensemble de données `Boston`.
