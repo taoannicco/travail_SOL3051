@@ -2,8 +2,10 @@
 title: "TP_final"
 output: html_document
 date: "2023-04-05"
+editor_options: 
+  markdown: 
+    wrap: sentence
 ---
-
 
 ```{r Packages}
 #install.packages("tree")
@@ -25,13 +27,13 @@ library(ISLR2)
 library(gbm)
 ```
 
-## Arbres de classifications : 
+## Arbres de classifications :
 
 Utilisation des arbres de classification pour analyser l'ensemble de données de la thèse d'Éric Lacourse.
 
-On commence par imputer les données afin de ne pas avoir de valeurs manquantes : 
+On commence par imputer les données afin de ne pas avoir de valeurs manquantes :
 
-1. Importation des données
+1.  Importation des données
 
 ```{r message=FALSE, error=FALSE}
 # Importation données
@@ -40,7 +42,7 @@ On commence par imputer les données afin de ne pas avoir de valeurs manquantes 
 input_data <- read.csv("Donnees_these_Lacourse.csv", na.strings = c("#NULL!", "NA"))
 ```
 
-2. Sélection des variables
+2.  Sélection des variables
 
 ```{r pressure, echo=FALSE}
 # Sélection des variables
@@ -49,7 +51,7 @@ data_v1 <- input_data[c("age", "travp","travm", "negp9", "negm9", "dets4", "dets
 
 ```
 
-3. Imputation
+3.  Imputation
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 # Imputation
@@ -76,10 +78,9 @@ data_v1$drog4[which(is.na(data_v1$drog4))] = mean(data_v1$drog4, na.rm = TRUE)
 summary(data_v1)
 ```
 
+On recode la variable `sui8` en variable binaire qu'on nomme `tentative_suicide`.
 
-On recode (SEULEMENT ?) la variable `sui8` en variable binaire qu'on nomme `tentative_suicide`
-
-```{r}
+```{r, warning=FALSE, message=FALSE}
 # sui1 et sui 8 
 # Code binaire 1 = oui ; 0 = non
 attach(data_v1)
@@ -87,7 +88,8 @@ tentative_suicide <- factor(ifelse(sui8 <= 1, "Oui", "Non"))
 data_v1 <- data.frame(data_v1, tentative_suicide)
 ```
 
-On utilise maintenant la fonction `tree()` pour créer un arbre de classification afin de prédire `tentative_suicide` en utilisant toutes les variables sauf `sui8`. La syntaxe de la fonction `tree()` est assez similaire à celle de la fonction `lm()`.
+On utilise maintenant la fonction `tree()` pour créer un arbre de classification afin de prédire `tentative_suicide` en utilisant toutes les variables sauf `sui8`.
+La syntaxe de la fonction `tree()` est assez similaire à celle de la fonction `lm()`.
 
 ```{r chunk4}
 tree.data.v1 <- tree(tentative_suicide ~ . - sui8, data_v1)
@@ -101,13 +103,6 @@ summary(tree.data.v1)
 
 On observe que le taux d'erreur d'entrainement est de 6%.
 
-Pour les arbres de classification, la déviance rapportée dans la sortie de `summary()` est donnée par $$
--2 \sum_m \sum_k n_{mk} \log \hat{p}_{mk},
-$$ où $n_{mk}$ est le nombre d'observations du $m$ème noeud terminal qui appartiennent à la $k$ème classe.
-Une faible déviance indique un arbre qui offre une bonne adéquation aux données (d'entraînement).
-La *déviance moyenne résiduelle* rapportée est simplement la déviance divisée par $n-|{T}_0|$, qui dans ce cas est de 304-10=294.
-
-
 On utilise la fonction `plot()` pour afficher la structure de l'arbre, et la fonction `text()` pour afficher les étiquettes des noeuds.
 
 L'argument `pretty = 0` indique à `R` d'inclure les noms de catégories pour tous les prédicteurs qualitatifs, plutôt que de simplement afficher une lettre pour chaque catégorie.
@@ -119,10 +114,6 @@ text(tree.data.v1, pretty = 0)
 
 L'indicateur le plus important de `sui1` semble être l'emplacement des rayonnages, puisque la première branche différencie les emplacements inférieurs à la valeur 1.28 et ceux supérieurs à 1.28.
 
-
-Si on tape simplement le nom de l'objet arbre, `R` imprime la sortie correspondant à chaque branche de l'arbre.
-`R` affiche le critère de division (par exemple, `ddrog2 < 2.27`), le nombre d'observations dans cette branche, la déviance, la prédiction globale pour la branche (`Oui` ou `Non`) et la fraction d'observations dans cette branche qui prennent les valeurs `Oui` et `Non`.
-Les branches qui représentent des noeuds terminaux sont indiquées par des astérisques.
 
 ```{r chunk7}
 tree.data.v1
@@ -155,7 +146,7 @@ Cette approche permet d'obtenir des prédictions correctes pour environ 44% des 
 
 Ensuite, on examine si l'élagage de l'arbre peut permettre d'améliorer les résultats.
 
-La fonction `cv.tree()` effectue une validation croisée afin de déterminer le niveau optimal de complexité de l'arbre ; l'élagage par la complexité des coûts (*cost complexity pruning*) est utilisé afin de sélectionner une séquence d'arbres à prendre en compte.
+La fonction `cv.tree()` effectue une validation croisée afin  ; l'élagage par la complexité des coûts (*cost complexity pruning*) est utilisé afin de sélectionner une séquence d'arbres à prendre en compte.
 
 On utilise l'argument `FUN = prune.misclass` pour indiquer qu'on veut que le taux d'erreur de classification guide le processus de validation croisée et d'élagage, plutôt que la valeur par défaut de la fonction `cv.tree()`, qui est la déviance.
 La fonction `cv.tree()` indique le nombre de noeuds terminaux de chaque arbre considéré (`size`) ainsi que le taux d'erreur correspondant et la valeur du paramètre de coût-complexité utilisé (`k`).
@@ -167,29 +158,22 @@ names(cv.df)
 cv.df
 ```
 
-MAlgré son nom, `dev` corresponds aux nombre d'erreur de validation croisée cross-validation errors.
-L'arbre avec 12 noeuds terminaux ne donne lieu qu'à 23 erreurs de validation croisée. Ce chiffre équivaut à la somme des carrés des erreurs pour chaque valeurs de compléxité ou size. 
-
-On visualise ensuite le taux d'erreur en fonction de `size` et de`k`. Il y a un seul groupe pour un degré de compléxité de 6 noeuds dans la validation croisée
-
-
+Il y a un seul groupe pour un degré de compléxité de 6 noeuds dans la validation croisée
 
 ```{r chunk10}
 par(mfrow = c(1, 2))
-plot(cv.df$size, cv.df$dev, type = "b")
-plot(cv.df$k, cv.df$dev, type = "b")
+plot(cv.df$size, cv.df$dev, type = "b", xlab = "Nombre de noeuds", ylab = "Erreurs de validation croisée")
+plot(cv.df$k, cv.df$dev, type = "b", xlab = "Degrés de compléxité" ,ylab = "Groupes")
 ```
 
-On applique maintenant la fonction `prune.misclass()` afin d'élaguer l'arbre pour obtenir l'arbre à 12 noeuds.
+On applique maintenant la fonction `prune.misclass()` afin d'élaguer l'arbre pour obtenir l'arbre à 9 noeuds.
 
 ```{r chunk11}
-prune.df <- prune.misclass(tree.data.v1, best = 12)
+prune.df <- prune.misclass(tree.data.v1, best = 9)
 plot(prune.df)
 text(prune.df, pretty = 0)
 ```
 
-Quelle est la performance de cet arbre élagué sur l'ensemble de données de test ?
-Une fois de plus, on utilise la fonction `predict()`.
 
 ```{r chunk12}
 tree.prediction <- predict(prune.df, data_v1.test,
@@ -204,18 +188,16 @@ Maintenant, 46.5% des observations de test sont correctement classées, donc non
 Si on augmente la valeur de `best`, on obtiens un arbre élagué plus grand avec une précision de classification plus faible :
 
 ```{r chunk13}
-prune.df <- prune.misclass(tree.data.v1, best = 9)
+prune.df <- prune.misclass(tree.data.v1, best = 12)
 plot(prune.df)
 text(prune.df, pretty = 0)
 tree.prediction <- predict(prune.df, data_v1.test,
     type = "class")
 table(tree.prediction, suicide.test)
-(89 + 4) / 200
+(84 + 4) / 200
 ```
 
-
-## Arbres de régression : 
-
+## Arbres de régression :
 
 ```{r chunk14}
 set.seed(1)
@@ -226,38 +208,31 @@ tree.data.v1 <- tree(tentative_suicide ~ . -sui8, data_v1, subset = train)
 summary(tree.data.v1)
 ```
 
-Remarquez que la sortie de `summary()` indique que seules quatre des variables ont été utilisées pour construire l'arbre.
 Dans le contexte d'un arbre de régression, la déviance est simplement la somme des erreurs au carré pour l'arbre.
-On visualise maintenant l'arbre.
+On visualise maintenant l'arbre : 
 
 ```{r chunk15}
 plot(tree.data.v1)
 text(tree.data.v1, pretty = 0)
 ```
 
-La variable `lstat` mesure le pourcentage de personnes ayant un statut socio-économique faible, tandis que la variable `rm` correspond au nombre moyen de pièces.
-L'arbre indique que des valeurs plus grandes de `rm`, ou des valeurs plus faibles de `lstat` correspondent à des maisons plus chères.
-Par exemple, l'arbre prédit un prix médian de 45 400\$ pour les maisons situées dans les secteurs de recensement dans lesquels `rm >= 7,553`.
-
-Il est intéressant de noter qu'on aurait pu créer un arbre beaucoup plus grand, en utlissant l'argument `control = tree.control(nobs = length(train), mindev = 0)` dans la fonction `tree()`.
-
-On utilise maintenant la fonction `cv.tree()` pour voir si l'élagage de l'arbre améliore sa performance.
+On utilise maintenant la fonction `cv.tree()` pour voir si l'élagage de l'arbre améliore sa performance : 
 
 ```{r chunk16}
 cv.data.v1 <- cv.tree(tree.data.v1)
-plot(cv.data.v1$size, cv.data.v1$dev, type = "b")
+plot(cv.data.v1$size, cv.data.v1$dev, type = "b", xlab = "Nombre de noeuds", ylab = "Complexité")
 ```
 
 Dans ce cas, l'arbre le plus complexe considéré est sélectionné par validation croisée.
 Cependant, si on veut élaguer l'arbre, on peut le faire en utilisant la fonction `prune.tree()` :
 
 ```{r chunk17}
-prune.data.v1 <- prune.tree(tree.data.v1, best = 8)
+prune.data.v1 <- prune.tree(tree.data.v1, best = 7)
 plot(prune.data.v1)
 text(prune.data.v1, pretty = 0)
 ```
-Les prunning a des résultats similaires 
 
+Les prunning a des résultats similaires aux précédents arbres. 
 
 Conformément aux résultats de la validation croisée, on utilise l'arbre non élagué pour faire des prédictions sur l'ensemble de test.
 
@@ -273,13 +248,6 @@ abline(0, 1)
 sprintf("L'erreur résiduelle (MSE) de l'ensemble de test associée à l'arbre de régression est de %.1f%%", mean((yhat - data.v1.test)^2))
 ```
 
-
-
-
-
-
-
-
 ## Bagging et forêts aléatoires
 
 On applique la procédure de *bagging* et les forêts aléatoires aux données de `Data_v1`, en utilisant la bibliothèque `randomForest` dans `R`.
@@ -290,13 +258,13 @@ Rappelez-vous que le *bagging* est simplement un cas particulier de forêt aléa
 Par conséquent, la fonction `randomForest()` peut être utilisée pour effectuer à la fois les forêts aléatoires et le *bagging*.
 On commence par faire le *bagging*
 
-Pour les étapes préliminaires, nous avions besoin de la variable tentative_suicide afin d'avoir une variable codée Oui ou Non selon les résultats pour sui8. Pour le reste de l'étude, nous n'avons plus besoin de cette dernière et nous la soustrairons aux modèles observés.
+Pour les étapes préliminaires, nous avions besoin de la variable tentative_suicide afin d'avoir une variable codée Oui ou Non selon les résultats pour sui8.
+Pour le reste de l'étude, nous n'avons plus besoin de cette dernière et nous la soustrairons aux modèles observés.
 
 ```{r chunk19}
 #install.packages("randomForest")
 library(randomForest)
 ```
-
 
 ```{r chunk19/2}
 set.seed(1)
@@ -311,12 +279,8 @@ L'argument `mtry = 20` indique que les 20 prédicteurs doivent tous être pris e
 
 Quelle est la performance de ce modèle avec *bagging* sur l'ensemble de test ?
 
-
-
 La MSE de l'ensemble de test associé à l'arbre de régression avec *bagging* est de 23,42, soit environ deux tiers de ce qu'on avait obtenu à l'aide d'un arbre unique à élagage optimal.
 On peut modifier le nombre d'arbres cultivés par `randomForest()` en utilisant l'argument `ntree` :
-
-
 
 ```{r chunk21}
 bag.data.v1 <- randomForest(sui8 ~ .-tentative_suicide, data = data_v1,
@@ -358,22 +322,17 @@ varImpPlot(rf.data.v1)
 
 Les résultats indiquent que pour tous les arbres considérés dans la forêt aléatoire, la richesse de la communauté (`lstat`) et la taille de la maison (`rm`) sont de loin les deux variables les plus importantes.
 
-
-
-
 ## Boosting
 
 Pour le *boosting*, on utilise le paquet `gbm` et la fonction `gbm()` pour créer des arbres de régression boostés à l'ensemble de données `Boston`.
 On exécute `gbm()` avec l'option `distribution = "gaussian"` puisqu'il s'agit d'un problème de régression ; s'il s'agissait d'un problème de classification binaire, on utiliserait plutôt `distribution = "bernoulli"`.
 L'argument `n.trees = 5000` indique qu'on veut 5000 arbres, et l'option `interaction.depth = 4` limite la profondeur de chaque arbre.
 
-Étant donné que nous reconcentrons l'étude sur la variable sui8, la distribution ne sera pas de bernouilli mais plutôt gaussienne. 
-
+Étant donné que nous reconcentrons l'étude sur la variable sui8, la distribution ne sera pas de bernouilli mais plutôt gaussienne.
 
 ```{r chunk25}
 library(gbm)
 ```
-
 
 ```{r chunk25/2}
 set.seed(1)
@@ -427,7 +386,6 @@ Dans ce cas-ci, utiliser $\lambda=0.2$ donne une plus petite erreur de test que 
 library(BART)
 ```
 
-
 ```{r BART/2}
 x <- data_v1[, 1:21]
 y <- data_v1[, "sui8"]
@@ -438,5 +396,3 @@ ytest <- x[-train]
 set.seed(1)
 bartfit <- gbart(xtrain, ytrain, x.test = xtest)
 ```
-
-
